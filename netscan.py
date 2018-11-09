@@ -44,6 +44,7 @@ class Masscan:
             host = nmaprun['host']
         except:
             print "IO Error"
+	print host
         for entry in host:
             port = entry['ports']['port']
             try:
