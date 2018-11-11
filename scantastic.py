@@ -5,6 +5,8 @@ import argparse
 import sys
 import requests
 import string
+import database
+import mysql.connector
 from datetime import datetime
 from time import sleep
 from elasticsearch import Elasticsearch
@@ -57,12 +59,35 @@ def returnTitle(content):
         t2 = string.split(t1, '</title>')[0]
     return t2
 
+# Check if dirbuster result is already in DB
+def db_check_duplicate(data, cursor):
+	ret = True
+	stmt = "SELECT ip FROM dirb_scan WHERE ip = %s AND link = %s"
+	res = cursor.execute(stmt, (data['ip'], data['link'],))
+        rows = cursor.fetchall()
+        count = cursor.rowcount
+        if count > 0:
+                print "Dir in db {}. Returning..".format(data['link'])
+                pass
+        else:
+                print "Dir {} not found.".format(data['link'])
+		ret = False
+	return ret
+
+# Insert dirbuster results to DB
+def db_insert_dirb(data, cursor, cnx):
+	cursor = cnx.cursor(prepared=True)
+	stmt = "INSERT INTO dirb_scan (ip, status,content_length, content, title, link, directory) VALUES (%s, %s, %s, %s, %s, %s, %s);"
+	res = cursor.execute(stmt, (data['ip'], data['status'], data['content-length'], data['content'], data['title'], data['link'], data['directory'],))
+	cnx.commit()
 
 # Make requests
-def requestor(urls, dirb, host, port, agent, esindex, usees):
+def requestor(urls, dirb, agent):
     data = {}
-    es = Elasticsearch([{u'host': host, u'port': port}])
     user_agent = {'User-agent': agent}
+    # init db connector
+    cnx = mysql.connector.connect(user=database.db_user, password=database.db_passwd,host=database.db_host,database=database.db_name)
+    cursor = cnx.cursor(prepared=True)
     for url in urls:
         urld = url + dirb
         try:
@@ -105,22 +130,20 @@ def requestor(urls, dirb, host, port, agent, esindex, usees):
             }
             try:
                 if data['status'] == 200:
-                    if usees == False:
-                        result = es.index(index=esindex, doc_type='hax',
-                                          body=data)
-                    else:
+                    if db_check_duplicate(data, cursor) == True:
                         pass
+                    else:
+                        db_insert_dirb(data, cursor, cnx)
                 else:
                     pass
             except:
                 data['title'] = 'Unicode Error'
                 data['content'] = 'Unicode Error'
                 if data['status'] == 200:
-                    if usees == False:
-                        result = es.index(index=esindex, doc_type='hax',
-                                          body=data)
-                    else:
+                    if db_check_duplicate(data, cursor) == True:
                         pass
+                    else:
+                        db_insert_dirb(data, cursor, cnx)
                 else:
                     pass
 
@@ -142,30 +165,30 @@ def scanlst(hostfile, ports, xml, index, eshost, esport, noin):
         ms.import_es(index, eshost, esport)
         print ms.output
 
-# Run regular masscan on specified range
+# Run regular nmap scan on specified range
 def nscan(host, ports, xml, index, eshost, esport, noin):
     ms = Nmap(host, 'xml/' + xml, ports)
     ms.run()
     if noin == False:
-        ms.import_es(index, eshost, esport)
+        ms.import_db()
         print ms.output
 
 
-# Run masscan on file of ranges
+# Run nmap scan on file of ranges
 def nscanlst(hostfile, ports, xml, index, eshost, esport, noin):
     ms = Nmap(hostfile, 'xml/' + xml, ports)
     ms.runfile()
     if noin == False:
-        ms.import_es(index, eshost, esport)
+        ms.import_db()
         print ms.output
 
 def export_xml(xml, index, eshost, esport):
     ms = Masscan('x', 'xml/' + xml, 'y')
     ms.import_es(index, eshost, esport)
 
-def nexport_xml(xml, index, eshost, esport):
+def nexport_xml(xml):
     ms = Nmap('x', 'xml/' + xml, 'y')
-    ms.import_es(index, eshost, esport)
+    ms.import_db()
 
 def delete_index(dindex, eshost, esport):
     url = 'http://' + eshost + ':' + str(esport) + '/' + dindex
@@ -278,9 +301,7 @@ if __name__ == '__main__':
             for i in range(0, len(splitlist)):
                 p = multiprocessing.Process(target=requestor,
                                             args=(
-                                                list(splitlist[i]), word, args.eshost, args.port, args.agent,
-                                                args.index,
-                                                args.noelastics))
+                                                list(splitlist[i]), word, args.agent))
                 threads.append(p)
             try:
                 for p in threads:

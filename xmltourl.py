@@ -51,7 +51,7 @@ class Xml2urls2:
 		nmaprun = self.xml['nmaprun']
 		scanhost = nmaprun['host']
 		for i in scanhost:
-			address = i['address'][0]['@addr']
+			address = i['address']['@addr']
 			port1 = dict(i)
 			try:
 				if int(port1['ports']['port']['@portid']) > 0:
