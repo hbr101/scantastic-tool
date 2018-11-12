@@ -2,17 +2,13 @@
 
 ## It's bloody scantastic
 
-If you like this and are feeling a bit(coin) generous - 1JdSGqg2zGTbpFMJPLbWoXg7Nng3z1Qp58
-
-It works for me: http://makthepla.net/scantastichax.png
-
  - Dependencies: (DIY - I ain't supportin shit)
  - Masscan - https://github.com/robertdavidgraham/masscan
  - Nmap - https://nmap.org/download.html
  - MariaDB
 
 
-This tool can be used to store masscan or nmap data in database, 
+This tool can be used to store masscan or nmap data in database.
 
 It allows performs distributed directory brute-forcing. 
 
