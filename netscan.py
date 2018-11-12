@@ -71,7 +71,8 @@ class Nmap:
         self.ports = ps
 
     def run(self):
-        self.args = ("nmap", "-sS", "-Pn", self.ip_range,
+	# T1 for more stealth
+        self.args = ("nmap", "-T1", "-sS", "-Pn", self.ip_range,
                      "-oX", self.xml_output, "-p", self.ports, "--open")
         popen = subprocess.Popen(self.args, stdout=subprocess.PIPE)
         popen.wait()
@@ -79,7 +80,8 @@ class Nmap:
         print "Scan completed!"
 
     def runfile(self):
-        self.args = ("nmap", "-sS", "-Pn", "-iL", self.ip_range,
+	# T1 for more stealth
+        self.args = ("nmap", "-T1", "-sS", "-Pn", "-iL", self.ip_range,
                      "-oX", self.xml_output, "-p", self.ports, "--open")
         popen = subprocess.Popen(self.args, stdout=subprocess.PIPE)
         popen.wait()

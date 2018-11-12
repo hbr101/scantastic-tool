@@ -1,0 +1,5 @@
+#exclude everything except result dirs
+/urls/*
+/words/*
+/xml/*
+/database.py
