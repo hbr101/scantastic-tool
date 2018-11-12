@@ -7,6 +7,9 @@ import requests
 import string
 import database
 import mysql.connector
+import logging
+import time
+import random
 from datetime import datetime
 from time import sleep
 from elasticsearch import Elasticsearch
@@ -17,6 +20,9 @@ from xmltourl import Xml2urls2
 from numpy import array_split
 
 requests.packages.urllib3.disable_warnings()
+logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %H:%M:%S:', filename='/var/log/scantastic/scan.log', level=logging.INFO)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("requests").setLevel(logging.WARNING)
 
 def version_info():
 	VERSION_INFO = 'Scantastic v2.0'
@@ -67,10 +73,10 @@ def db_check_duplicate(data, cursor):
         rows = cursor.fetchall()
         count = cursor.rowcount
         if count > 0:
-                print "Dir in db {}. Returning..".format(data['link'])
+                logging.info("Dir in db {}. Returning..".format(data['link']))
                 pass
         else:
-                print "Dir {} not found.".format(data['link'])
+                logging.info("Dir {} not found.".format(data['link']))
 		ret = False
 	return ret
 
@@ -89,6 +95,10 @@ def requestor(urls, dirb, agent):
     cnx = mysql.connector.connect(user=database.db_user, password=database.db_passwd,host=database.db_host,database=database.db_name)
     cursor = cnx.cursor(prepared=True)
     for url in urls:
+	# Calc random number
+	randomint = random.randint(1,10)
+        sleep(randomint)
+	# and pray that we do not get blacklisted
         urld = url + dirb
         try:
             r = requests.get(urld, timeout=10, headers=user_agent, verify=False)
@@ -104,7 +114,8 @@ def requestor(urls, dirb, agent):
             if 'image' in r.headers['content-type']:
                 content = 'image'
             if r.status_code == 200:
-                print urld + ' - ' + str(r.status_code) + ':' + str(len(r.content))
+		pass
+#                logging.info(urld + ' - ' + str(r.status_code) + ':' + str(len(r.content)))
         except requests.exceptions.Timeout:
             # print urld+' - Timeout'
             stat = -1

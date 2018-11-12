@@ -22,7 +22,8 @@ class Xml2urls:
         host = nmaprun['host']
 
         for entry in host:
-            port = entry['ports']['port']
+            port = 0
+#            port = entry['ports']['port']
             if int(port['@portid']) == 80:
                 name = entry['address']['@addr']
                 print 'http://' + name + '/'
@@ -72,4 +73,3 @@ class Xml2urls2:
 						print 'https://'+address+'/'
 					else:
 						print 'http://'+address+':'+x+'/'
-				

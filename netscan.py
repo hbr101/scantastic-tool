@@ -6,6 +6,7 @@ import socket
 import xmltodict
 import database
 import mysql.connector
+import logging
 from elasticsearch import Elasticsearch
 from datetime import datetime
 
@@ -77,7 +78,7 @@ class Nmap:
         popen = subprocess.Popen(self.args, stdout=subprocess.PIPE)
         popen.wait()
         self.output = popen.stdout.read()
-        print "Scan completed!"
+	logging.info('Nmap scan completed for {}'.format(self.ip_range))
 
     def runfile(self):
 	# T1 for more stealth
@@ -86,7 +87,7 @@ class Nmap:
         popen = subprocess.Popen(self.args, stdout=subprocess.PIPE)
         popen.wait()
         self.output = popen.stdout.read()
-        print "Scan completed!"
+	logging.info('Nmap scan completed for {}'.format(self.ip_range))
 
     def toDB(self, address, ports, cursor, stmt, cnx):
         try:
@@ -99,15 +100,15 @@ class Nmap:
         rows = cursor.fetchall()
         count = cursor.rowcount
 	if count > 0:
-		print "Already in db {}. Returning..".format(link)
+		logging.info("Already in db {}. Returning..".format(link))
 		return
 	else:
-		print "Address {} not found. Inserting to DB..".format(link)
+		logging.info("Address {} not found. Inserting to DB..".format(link))
 
 	stmt = "INSERT INTO nmap_scan (name, ip, port, link) VALUES (%s, %s, %s, %s);"
 	res = cursor.execute(stmt, (name, address, ports, link,))
 	cnx.commit()
-	print "INSERT to DB successful: {}".format(link)
+	logging.info("INSERT to DB successful: {}".format(link))
 
     def import_db(self):
         cnx = mysql.connector.connect(user=database.db_user, password=database.db_passwd,host=database.db_host,database=database.db_name)
@@ -133,6 +134,6 @@ class Nmap:
                                 x = z['@portid']
                                 self.toDB(address, str(x), cursor, stmt, cnx)
         except IOError, e:
-            print e
+            logging.info(e)
 	cursor.close()
 	cnx.close()

@@ -9,12 +9,10 @@ It works for me: http://makthepla.net/scantastichax.png
  - Dependencies: (DIY - I ain't supportin shit)
  - Masscan - https://github.com/robertdavidgraham/masscan
  - Nmap - https://nmap.org/download.html
- - ElasticSearch - http://www.elasticsearch.org/guide/en/elasticsearch/guide/current/_installing_elasticsearch.html
- - Kibana - http://www.elasticsearch.org/overview/kibana/installation/
+ - MariaDB
 
 
-This tool can be used to store masscan or nmap data in elasticsearch, 
-(the scantastic plugin in the image is not here)
+This tool can be used to store masscan or nmap data in database, 
 
 It allows performs distributed directory brute-forcing. 
 
@@ -27,14 +25,14 @@ All your base are belong to us. I might maintain or improve this over time. MIGH
 Run and import a scan of home /24 network
 
 ```
-./scantastic.py -s -H 192.168.1.0/24 -p 80,443 -x homescan.xml (with masscan)
+./scantastic.py -s -H 192.168.1.0/24 -p 80,443 -x homescan.xml (with masscan) - doesn't work
 ./scantastic.py -ns -H 192.168.1.0/24 -p 80,443 -x homescan.xml (with nmap)
 ```
 
 Export homescan to a list of urls
 
 ```
-./scantastic.py -eurl -x homescan.xml > urlist (with masscan)
+./scantastic.py -eurl -x homescan.xml > urlist (with masscan) - doesn't work
 ./scantastic.py -nurl -x homescan.xml > urlist (with nmap)
 ```
 
@@ -47,9 +45,9 @@ using 10 threads (By default it uses 1 thread)
 
 ```
 root@ubuntu:~/scantastic-tool# ./scantastic.py -h
-usage: scantastic.py [-h] [-v] [-d] [-s] [-noes] [-sl] [-in] [-e] [-eurl]
+usage: scantastic.py [-h] [-v] [-d] [-s] [-sl] [-in] [-e] [-eurl]
                      [-del] [-H HOST] [-p PORTS] [-x XML] [-w WORDS] [-u URLS]
-                     [-t THREADS] [-esh ESHOST] [-esp PORT] [-i INDEX]
+                     [-t THREADS]
                      [-a AGENT]
 
 optional arguments:
@@ -59,12 +57,9 @@ optional arguments:
   -s, --scan            Run masscan on single range. Specify --host & --ports
                         & --xml
   -ns, --nmap           Run Nmap on a single range specify -H & -p
-  -noes, --noelastics   Run scan without elasticsearch insertion
   -sl, --scanlist       Run masscan on a list of ranges. Requires --host &
                         --ports & --xml
   -nsl, --nmaplist      Run Nmap on a list of ranges -H & -p & -x
-  -in, --noinsert       Perform a scan without inserting to elasticsearch
-  -e, --export          Export a scan XML into elasticsearch. Requires --xml
   -eurl, --exporturl    Export urls to scan from XML file. Requires --xml
   -nurl, --exportnmap   Export urls from nmap XML, requires -x
   -del, --delete        Specify an index to delete.
@@ -78,14 +73,6 @@ optional arguments:
   -u URLS, --urls URLS  List of Urls to be used with --dirb
   -t THREADS, --threads THREADS
                         Specify the number of threads to use.
-  -esh ESHOST, --eshost ESHOST
-                        Specify the elasticsearch host
-  -esp PORT, --port PORT
-                        Specify ElasticSearch port
-  -i INDEX, --index INDEX
-                        Specify the ElasticSearch index
   -a AGENT, --agent AGENT
                         Specify a User Agent for requests
 ```
-
-Use -noes and -in scans to not import scans by default upon completion of a scan
