@@ -3,6 +3,32 @@
 # ===============================
 
 import xmltodict
+import logging
+import mysql.connector
+import database
+import os
+
+# Check if link is already in DB
+def db_check_duplicate_2(data, cursor):
+        ret = True
+        stmt = "SELECT link FROM url_links WHERE link = %s"
+        res = cursor.execute(stmt, (data,))
+        rows = cursor.fetchall()
+        count = cursor.rowcount
+        if count > 0:
+                logging.info("Link in db {}. Returning..".format(data))
+                pass
+        else:
+                logging.info("Link {} not found.".format(data))
+                ret = False
+        return ret
+
+# Insert link to DB
+def db_insert_link(data, cursor, cnx):
+        cursor = cnx.cursor(prepared=True)
+        stmt = "INSERT INTO url_links (link) VALUES (%s);"
+        res = cursor.execute(stmt, (data,))
+        cnx.commit()
 
 
 class Xml2urls:
@@ -42,7 +68,7 @@ class Xml2urls2:
 		self.xmlf = xmlfile
 		self.data = ''
 		try:
-			with open('xml/' + self.xmlf) as myf:
+			with open('/var/log/scantastic/' + self.xmlf) as myf:
 				self.data = myf.read().replace('\n', '')
 		except IOError:
 			print 'File IO Error'
@@ -51,25 +77,47 @@ class Xml2urls2:
 	def run(self):
 		nmaprun = self.xml['nmaprun']
 		scanhost = nmaprun['host']
+		# init DB connector and cursor
+		cnx = mysql.connector.connect(user=database.db_user, password=database.db_passwd,host=database.db_host,database=database.db_name)
+		cursor = cnx.cursor(prepared=True)
 		for i in scanhost:
+			link = ""
 			address = i['address']['@addr']
 			port1 = dict(i)
 			try:
 				if int(port1['ports']['port']['@portid']) > 0:
 					port2 = port1['ports']['port']['@portid']
 					if port2 == '80':
-						print 'http://'+address+'/'
+						link = 'http://'+address+'/'
 					elif port2 == '443':
-						print 'https://'+address+'/'
+						link = 'https://'+address+'/'
 					else:
-						print 'http://'+address+':'+port2+'/'
+						link = 'http://'+address+':'+port2+'/'
 			except:
 				port2 = i['ports']['port']
 				for z in port2:
 					x = z['@portid']
 					if x == '80':
-						print 'http://'+address+'/'
+						link = 'http://'+address+'/'
 					elif x == '443':
-						print 'https://'+address+'/'
+						link = 'https://'+address+'/'
 					else:
-						print 'http://'+address+':'+x+'/'
+						link = 'http://'+address+':'+x+'/'
+					# Check if link is already in DB
+					if db_check_duplicate_2(link, cursor) == True:
+						pass
+					else:
+						# Insert to DB
+						db_insert_link(link, cursor, cnx)
+			# Check if link is already in DB
+			if db_check_duplicate_2(link, cursor) == True:
+				pass
+			else:
+				# Insert to DB
+				db_insert_link(link, cursor, cnx)
+		# Remove xml file
+		try:
+    			os.remove('/var/log/scantastic/'+self.xmlf)
+		except OSError:
+    			pass
+

@@ -77,7 +77,6 @@ class Nmap:
                      "-oX", self.xml_output, "-p", self.ports, "--open")
         popen = subprocess.Popen(self.args, stdout=subprocess.PIPE)
         popen.wait()
-        self.output = popen.stdout.read()
 	logging.info('Nmap scan completed for {}'.format(self.ip_range))
 
     def runfile(self):
@@ -86,7 +85,6 @@ class Nmap:
                      "-oX", self.xml_output, "-p", self.ports, "--open")
         popen = subprocess.Popen(self.args, stdout=subprocess.PIPE)
         popen.wait()
-        self.output = popen.stdout.read()
 	logging.info('Nmap scan completed for {}'.format(self.ip_range))
 
     def toDB(self, address, ports, cursor, stmt, cnx):

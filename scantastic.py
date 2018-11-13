@@ -35,13 +35,48 @@ def version_info():
 	print VERSION_INFO
 	print AUTHOR_INFO
 
+def start_dirbuster(raw_words, num_threads, agent):
+        try:
+#            with open(args.urls) as f:
+#                urls = f.read().splitlines()
+	# Open word list
+            with open('/var/log/scantastic/'+raw_words) as f:
+                words = f.read().splitlines()
+        except IOError:
+            logging.info("File not found {}. Exiting..".format(raw_words))
+            exit(0)
+
+	# Create list from url_links table
+	urls = db_get_links()
+        threads = []
+        splitlist = list(split_urls(urls, num_threads))
+
+        for word in words:
+            # Disable this when in prod
+            logging.info(("Word: {}").format(word))
+            for i in range(0, len(splitlist)):
+                p = multiprocessing.Process(target=requestor,
+                                            args=(
+                                                list(splitlist[i]), word, agent))
+                threads.append(p)
+            try:
+                for p in threads:
+                    p.start()
+                for p in threads:
+                    p.join()
+            except KeyboardInterrupt:
+                print 'Killing Threads...'
+                for p in threads:
+                    p.terminate()
+                sys.exit(0)
+            threads = []
 
 # Split the list of urls into chunks for threading
 def split_urls(u, t):
-    print 'Number of URLS: ' + str(len(u))
-    print 'Threads: ' + str(t)
-    print 'URLS in each split: ' + str(len(u) / t)
-    print '========================='
+    logging.info('Number of URLS: ' + str(len(u)))
+    logging.info('Threads: ' + str(t))
+    logging.info('URLS in each split: ' + str(len(u) / t))
+    logging.info('=========================')
     sleep(1)
     return array_split(u, t)
 
@@ -87,6 +122,19 @@ def db_insert_dirb(data, cursor, cnx):
 	res = cursor.execute(stmt, (data['ip'], data['status'], data['content-length'], data['content'], data['title'], data['link'], data['directory'],))
 	cnx.commit()
 
+def db_get_links():
+	list = []
+	cnx = mysql.connector.connect(user=database.db_user, password=database.db_passwd,host=database.db_host,database=database.db_name)
+	cursor = cnx.cursor(prepared=True)
+	stmt = "SELECT link FROM url_links"
+	res = cursor.execute(stmt)
+	# link is bytearray and we need to encode it
+	for (link) in cursor:
+		list.append(link[0].decode('utf-8'))
+	cursor.close()
+	cnx.close()
+	return list
+
 # Make requests
 def requestor(urls, dirb, agent):
     data = {}
@@ -114,8 +162,8 @@ def requestor(urls, dirb, agent):
             if 'image' in r.headers['content-type']:
                 content = 'image'
             if r.status_code == 200:
+                logging.info(urld + ' - ' + str(r.status_code) + ':' + str(len(r.content)))
 		pass
-#                logging.info(urld + ' - ' + str(r.status_code) + ':' + str(len(r.content)))
         except requests.exceptions.Timeout:
             # print urld+' - Timeout'
             stat = -1
@@ -158,8 +206,10 @@ def requestor(urls, dirb, agent):
                 else:
                     pass
 
+    cursor.close()
+    cnx.close()
 
-# Run regular masscan on specified range
+# Run regular masscan on specified range - DOESN't WORK
 def scan(host, ports, xml, index, eshost, esport, noin):
     ms = Masscan(host, 'xml/' + xml, ports)
     ms.run()
@@ -168,7 +218,7 @@ def scan(host, ports, xml, index, eshost, esport, noin):
         print ms.output
 
 
-# Run masscan on file of ranges
+# Run masscan on file of ranges - DOESN't WORK
 def scanlst(hostfile, ports, xml, index, eshost, esport, noin):
     ms = Masscan(hostfile, 'xml/' + xml, ports)
     ms.runfile()
@@ -176,22 +226,34 @@ def scanlst(hostfile, ports, xml, index, eshost, esport, noin):
         ms.import_es(index, eshost, esport)
         print ms.output
 
-# Run regular nmap scan on specified range
-def nscan(host, ports, xml, index, eshost, esport, noin):
-    ms = Nmap(host, 'xml/' + xml, ports)
-    ms.run()
-    if noin == False:
-        ms.import_db()
-        print ms.output
 
+# Run regular nmap scan on specified range
+def nscan(host, ports, xml, raw_words, num_threads, agent):
+    ms = Nmap(host, '/var/log/scantastic/' + xml, ports)
+    ms.run()
+    ms.import_db()
+    logging.info("Starting to parse XML file...")
+    x = Xml2urls2(xml)
+    x.run()
+    logging.info("Parsing should be completed...")
+    logging.info("Starting dirbuster...")
+    start_dirbuster(raw_words, num_threads, agent)
+    logging.info("Dirbuster done..Exiting")
+    exit(0)
 
 # Run nmap scan on file of ranges
-def nscanlst(hostfile, ports, xml, index, eshost, esport, noin):
-    ms = Nmap(hostfile, 'xml/' + xml, ports)
+def nscanlst(hostfile, ports, xml, raw_words, num_threads, agent):
+    ms = Nmap(hostfile, '/var/log/scantastic/' + xml, ports)
     ms.runfile()
-    if noin == False:
-        ms.import_db()
-        print ms.output
+    ms.import_db()
+    logging.info("Starting to parse XML file...")
+    x = Xml2urls2(xml)
+    x.run()
+    logging.info("Parsing should be completed...")
+    logging.info("Starting dirbuster...")
+    start_dirbuster(raw_words, num_threads, agent)
+    logging.info("Dirbuster done..Exiting")
+    exit(0)
 
 def export_xml(xml, index, eshost, esport):
     ms = Masscan('x', 'xml/' + xml, 'y')
@@ -260,7 +322,7 @@ if __name__ == '__main__':
                        help='Specify ElasticSearch port')
     parse.add_argument('-i', '--index', type=str, default='scantastic',
                        help='Specify the ElasticSearch index')
-    parse.add_argument('-a', '--agent', type=str, default='Scantastic O_o',
+    parse.add_argument('-a', '--agent', type=str, default='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:58.0) Gecko/20100101 Firefox/58.0',
                        help='Specify a User Agent for requests')
     args = parse.parse_args()
 
@@ -275,15 +337,13 @@ if __name__ == '__main__':
         scan(args.host, args.ports, args.xml, args.index, args.eshost,
              args.port, args.noinsert)
     elif args.nmap and (args.host is not None):
-	nscan(args.host, args.ports, args.xml, args.index, args.eshost,
-             args.port, args.noinsert)
+	nscan(args.host, args.ports, args.xml, args.words, args.threads, args.agent)
 
     if args.scanlist and (args.host is not None):
         scanlst(args.host, args.ports, args.xml, args.index, args.eshost,
                 args.port, args.noinsert)
     elif args.nmaplist and (args.host is not None):
-	nscanlst(args.host, args.ports, args.xml, args.index, args.eshost,
-                args.port, args.noinsert)
+	nscanlst(args.host, args.ports, args.xml, args.words, args.threads, args.agent)
 
     if args.export:
         export_xml(args.xml, args.index, args.eshost, args.port)
@@ -295,15 +355,20 @@ if __name__ == '__main__':
         export_urls(args.xml)
     elif args.exportnmap:
 	nexport_urls(args.xml)
-
-    if args.dirb:
+'''    if args.dirb:
         try:
-            with open(args.urls) as f:
-                urls = f.read().splitlines()
-            with open(args.words) as f:
+#            with open(args.urls) as f:
+#                urls = f.read().splitlines()
+	# Open word list
+            with open('/var/log/scantastic/'+args.words) as f:
                 words = f.read().splitlines()
         except IOError:
-            print 'File not found!'
+            logging.info("File not found {}. Exiting..".format(args.words))
+            exit(0)
+
+	# Create list from url_links table
+	urls = db_get_links()
+	print urls[0]
         threads = []
         splitlist = list(split_urls(urls, args.threads))
 
@@ -325,3 +390,4 @@ if __name__ == '__main__':
                     p.terminate()
                 sys.exit(0)
             threads = []
+'''
